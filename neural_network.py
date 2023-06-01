@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pylab as plt
 from typing import Tuple, List, Collection, Mapping
 
-from optimizer import *
+from optimizer import Optimizer, MomentumOptimizer, RMSPropOptimizer
 
 
 class TerminationCriteria:
