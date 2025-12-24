@@ -3,18 +3,16 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 import matplotlib.pylab as plt
-from typing import Tuple, List, Mapping
 
+from activation import *
 from optimizer import *
 
-
 # ---------------- Termination ---------------- #
-
 class TerminationCriteria:
     def __init__(self, max_iter, min_delta=1e-6, patience=50):
         self.max_iter = max_iter
         self.min_delta = min_delta
-        self.patience = patience
+        self.patience = patience # Number of iterations to wait without improvement
         self.patience_counter = 0
         self.best_loss = np.inf
 
@@ -33,7 +31,6 @@ class TerminationCriteria:
 
 
 # ---------------- Model ---------------- #
-
 class NeuralNetSolver:
     INPUT_DIM = 1
     HIDDEN_DIM = 32
@@ -53,44 +50,31 @@ class NeuralNetSolver:
             'bias_2': np.zeros((1, self.OUTPUT_DIM))
         }
 
+        self.activation = LeakyReLU()
         self.optimizer = RMSPropOptimizer(self.params_dict, lr=1e-3)
         self.termination_criteria = TerminationCriteria(self.MAX_ITER)
 
-    # -------- Activation -------- #
-
-    @staticmethod
-    def act_fn(x):
-        return x / (1 + np.exp(-x))
-
-    @staticmethod
-    def act_fn_deriv(x):
-        exp_neg = np.exp(-x)
-        return ((1 + exp_neg) - x * exp_neg) / ((1 + exp_neg) ** 2)
-
     # -------- Forward -------- #
-
     def forward(self, x):
         z1 = x @ self.params_dict['weights_1'] + self.params_dict['bias_1']
-        a1 = self.act_fn(z1)
+        a1 = self.activation.forward(z1)
 
         # Linear output (regression)
         y_hat = a1 @ self.params_dict['weights_2'] + self.params_dict['bias_2']
         return y_hat
 
     # -------- Loss -------- #
-
     @staticmethod
     def get_loss(y, y_hat):
         return np.mean((y - y_hat) ** 2)
 
     # -------- Backprop -------- #
-
     def get_loss_grad(self, X, y):
         B = X.shape[0]
 
         # Forward cache
         z1 = X @ self.params_dict['weights_1'] + self.params_dict['bias_1']
-        a1 = self.act_fn(z1)
+        a1 = self.activation.forward(z1)
         y_hat = a1 @ self.params_dict['weights_2'] + self.params_dict['bias_2']
 
         # dL/dy_hat
@@ -102,7 +86,7 @@ class NeuralNetSolver:
 
         # Backprop to layer 1
         d_a1 = d_z2 @ self.params_dict['weights_2'].T
-        d_z1 = d_a1 * self.act_fn_deriv(z1)
+        d_z1 = d_a1 * self.activation.backward(z1)
 
         w1_grad = X.T @ d_z1 / B
         b1_grad = np.sum(d_z1, axis=0, keepdims=True) / B
@@ -115,7 +99,6 @@ class NeuralNetSolver:
         }
 
     # -------- Train -------- #
-
     def fit(self, X_train, y_train, X_test, y_test):
         train_losses, test_losses = [], []
         steps_for_eval = self.MAX_ITER // self.NUM_EVALS
@@ -144,13 +127,11 @@ class NeuralNetSolver:
 
         return train_losses, test_losses
 
-
 # ---------------- Data ---------------- #
-
 X = np.expand_dims(np.linspace(0, 100, 50), -1)
 y = np.expand_dims(5 * X[:, 0] + 3 * X[:, 0] ** 2 + 50, -1)
 
-# Normalize (CRITICAL)
+# Normalize input
 X_mean, X_std = X.mean(), X.std()
 y_mean, y_std = y.mean(), y.std()
 
@@ -160,17 +141,15 @@ y = (y - y_mean) / y_std
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 # ---------------- Train ---------------- #
-
 nn = NeuralNetSolver()
 train_losses, test_losses = nn.fit(X_train, y_train, X_test, y_test)
 
 # ---------------- Plots ---------------- #
-
 plt.figure()
 plt.plot(train_losses, label="Train")
 plt.plot(test_losses, label="Test")
 plt.legend()
-plt.xlabel("Eval step")
+plt.xlabel(f"Eval step (1 step = {nn.NUM_EVALS} iters)")
 plt.ylabel("MSE Loss")
 plt.title("Training Curve")
 

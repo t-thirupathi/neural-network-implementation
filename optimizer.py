@@ -1,4 +1,3 @@
-from typing import Mapping
 import numpy as np
 
 
@@ -8,11 +7,11 @@ class Optimizer:
     Returns parameter updates to be SUBTRACTED from parameters.
     """
 
-    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+    def __init__(self, params_dict, lr=1e-3):
         self.lr = lr
         self.params_dict = params_dict
 
-    def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
+    def step(self, param_grads):
         param_updates = {}
         for param_name, grad in param_grads.items():
             param_updates[param_name] = self.lr * grad
@@ -24,13 +23,13 @@ class Optimizer:
 class MomentumOptimizer(Optimizer):
     MOMENTUM_COEFF = 0.9
 
-    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+    def __init__(self, params_dict, lr=1e-3):
         super().__init__(params_dict, lr)
         self.velocity = {
             k: np.zeros_like(v) for k, v in params_dict.items()
         }
 
-    def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
+    def step(self, param_grads):
         param_updates = {}
         for k, grad in param_grads.items():
             self.velocity[k] = (
@@ -47,13 +46,13 @@ class RMSPropOptimizer(Optimizer):
     DECAY_RATE = 0.99
     EPS = 1e-8
 
-    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+    def __init__(self, params_dict, lr=1e-3):
         super().__init__(params_dict, lr)
         self.cache = {
             k: np.zeros_like(v) for k, v in params_dict.items()
         }
 
-    def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
+    def step(self, param_grads):
         param_updates = {}
         for k, grad in param_grads.items():
             self.cache[k] = (
