@@ -1,71 +1,65 @@
 from typing import Mapping
-from collections.abc import Collection
 import numpy as np
+
 
 class Optimizer:
     """
-      This class is responsible for calculating parameter updates during optimization.
+    Base optimizer class.
+    Returns parameter updates to be SUBTRACTED from parameters.
     """
-    LEARNING_RATE = 1e-2
 
-    def __init__(self, params_dict: Mapping[str, np.array]):
-      """
-      :param params_dict:
-        A dictionary of the parameter names to be optimized.
-      """
-      pass
+    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+        self.lr = lr
+        self.params_dict = params_dict
 
     def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
-        """
-            Calculate the parameter updates for a single step of optimization.
-        :param param_grads:
-            A dictionary of the parameter gradients.
-        :return:
-          A dictionary of parameter updates.
-        """
         param_updates = {}
-        for param_name, param_grad in param_grads.items():
-            param_updates[param_name] = self.LEARNING_RATE * param_grad
-
+        for param_name, grad in param_grads.items():
+            param_updates[param_name] = self.lr * grad
         return param_updates
 
+
+# ---------------- Momentum ---------------- #
 
 class MomentumOptimizer(Optimizer):
     MOMENTUM_COEFF = 0.9
 
-    def __init__(self, params_dict: Mapping[str, np.array]):
-        super().__init__(params_dict)
-        self.velocity = {}
-        for param_name, param_values in params_dict.items():
-            self.velocity[param_name] = np.zeros_like(param_values)
+    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+        super().__init__(params_dict, lr)
+        self.velocity = {
+            k: np.zeros_like(v) for k, v in params_dict.items()
+        }
 
     def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
         param_updates = {}
-        for param_name, param_grad in param_grads.items():
-            self.velocity[param_name] = self.MOMENTUM_COEFF * self.velocity[param_name] - self.LEARNING_RATE * param_grad
-            param_updates[param_name] = self.velocity[param_name]
-
+        for k, grad in param_grads.items():
+            self.velocity[k] = (
+                self.MOMENTUM_COEFF * self.velocity[k]
+                + self.lr * grad
+            )
+            param_updates[k] = self.velocity[k]
         return param_updates
 
+
+# ---------------- RMSProp ---------------- #
 
 class RMSPropOptimizer(Optimizer):
-    MOMENTUM_COEFF = 0.9
     DECAY_RATE = 0.99
+    EPS = 1e-8
 
-    def __init__(self, params_dict: Mapping[str, np.array]):
-        super().__init__(params_dict)
-        self.velocity = {}
-        self.cache = {}
-        for param_name, param_values in params_dict.items():
-            self.velocity[param_name] = np.zeros_like(param_values)
-            self.cache[param_name] = np.zeros_like(param_values)
+    def __init__(self, params_dict: Mapping[str, np.array], lr=1e-3):
+        super().__init__(params_dict, lr)
+        self.cache = {
+            k: np.zeros_like(v) for k, v in params_dict.items()
+        }
 
     def step(self, param_grads: Mapping[str, np.array]) -> Mapping[str, np.array]:
         param_updates = {}
-        for param_name, param_grad in param_grads.items():
-            self.cache[param_name] = self.DECAY_RATE * self.cache[param_name] + (1 - self.DECAY_RATE) * (param_grad ** 2)
-            adaptive_lr = self.LEARNING_RATE / (np.sqrt(self.cache[param_name]) + 1e-8)
-            param_updates[param_name] = -adaptive_lr * param_grad
-
+        for k, grad in param_grads.items():
+            self.cache[k] = (
+                self.DECAY_RATE * self.cache[k]
+                + (1 - self.DECAY_RATE) * (grad ** 2)
+            )
+            adaptive_lr = self.lr / (np.sqrt(self.cache[k]) + self.EPS)
+            param_updates[k] = adaptive_lr * grad
         return param_updates
-
