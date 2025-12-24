@@ -51,7 +51,7 @@ class NeuralNetSolver:
         }
 
         self.activation = LeakyReLU()
-        self.optimizer = RMSPropOptimizer(self.params_dict, lr=1e-3)
+        self.optimizer = AdamOptimizer(self.params_dict, lr=1e-3)
         self.termination_criteria = TerminationCriteria(self.MAX_ITER)
 
     # -------- Forward -------- #
