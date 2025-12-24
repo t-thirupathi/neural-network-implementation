@@ -32,13 +32,13 @@ class TerminationCriteria:
 
 # ---------------- Model ---------------- #
 class NeuralNetSolver:
-    INPUT_DIM = 1
-    HIDDEN_DIM = 32
+    INPUT_DIM = 2
+    HIDDEN_DIM = 2
     OUTPUT_DIM = 1
 
-    MAX_ITER = 10000
+    MAX_ITER = 10
     INIT_RANGE = 0.1
-    NUM_EVALS = 100
+    NUM_EVALS = 10
 
     def __init__(self):
         self.params_dict = {
@@ -49,8 +49,8 @@ class NeuralNetSolver:
                                           (self.HIDDEN_DIM, self.OUTPUT_DIM)),
             'bias_2': np.zeros((1, self.OUTPUT_DIM))
         }
-
-        self.activation = LeakyReLU()
+        print("self.params_dict:\n", self.params_dict)
+        self.activation = Sigmoid()
         self.optimizer = AdamOptimizer(self.params_dict, lr=1e-3)
         self.termination_criteria = TerminationCriteria(self.MAX_ITER)
 
@@ -116,11 +116,13 @@ class NeuralNetSolver:
             for k in self.params_dict:
                 self.params_dict[k] -= updates[k]
 
-            if iter % steps_for_eval == 0:
+            # if iter % steps_for_eval == 0:
+            if True:
                 test_pred = self.forward(X_test)
                 test_loss = self.get_loss(y_test, test_pred)
                 train_losses.append(train_loss)
                 test_losses.append(test_loss)
+                print("self.params_dict:\n", self.params_dict)
                 print(f"Iter {iter:5d} | Train {train_loss:.6f} | Test {test_loss:.6f}")
 
             iter += 1
@@ -128,7 +130,9 @@ class NeuralNetSolver:
         return train_losses, test_losses
 
 # ---------------- Data ---------------- #
-X = np.expand_dims(np.linspace(0, 100, 50), -1)
+x1 = np.expand_dims(np.linspace(0, 100, 11), -1)
+x2 = np.expand_dims(np.linspace(-50, 50, 11), -1)
+X = np.concatenate([x1, x2], axis=1)
 y = np.expand_dims(5 * X[:, 0] + 3 * X[:, 0] ** 2 + 50, -1)
 
 # Normalize input

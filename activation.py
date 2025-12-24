@@ -10,6 +10,9 @@ class Activation(ABC):
     @staticmethod
     @abstractmethod
     def forward(x: np.ndarray) -> np.ndarray:
+        """
+        Forward pass (apply activation function)
+        """
         pass
 
     @staticmethod
