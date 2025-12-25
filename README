@@ -1,1 +1,16 @@
-Python implementation of Neural Network from scratch
+# Simple Neural Network (from-scratch)
+
+A simple Python implementation of a neural network from scratch, without external libraries.
+
+## Usage
+- `python3 -m venv .venv` - create virtual environment
+- `source .venv/bin/active` - activate virtual environment
+- `pip install -r requirements` - install dependencies
+- `python neural_network.py` — run neural network
+- Change the optimization algorithms and activation functions to experiment
+
+## Files
+- `neural_network.py` — Model implementation
+- `activation.py` — Various activation functions
+- `optimizer.py` — Various optimization algorithms
+
