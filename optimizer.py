@@ -9,7 +9,8 @@ ParamDict = Dict[str, np.ndarray]
 class Optimizer(ABC):
     """
     Base optimizer class.
-    Returns parameter updates to be SUBTRACTED from parameters.
+    Returns param_update to be SUBTRACTED from parameters.
+    theta_t+1 = theta_t - param_update
     """
 
     def __init__(self, params_dict, lr=1e-3):
@@ -23,15 +24,16 @@ class Optimizer(ABC):
         """
         pass
 
-class SGDOptimizer(Optimizer):
+class GradientDescentOptimizer(Optimizer):
     """
-    Vanilla Stochastic Gradient Descent (full-batch).
+    Vanilla Gradient Descent (full-batch).
     """
 
     def __init__(self, params_dict, lr=1e-3):
         super().__init__(params_dict, lr)
 
     def step(self, param_grads: ParamDict) -> ParamDict:
+        # theta_t+1 = theta_t - lr * gradient
         param_updates = {}
         for k, grad in param_grads.items():
             param_updates[k] = self.lr * grad
@@ -39,7 +41,7 @@ class SGDOptimizer(Optimizer):
 
 
 class MomentumOptimizer(Optimizer):
-    MOMENTUM_COEFF = 0.9
+    MOMENTUM_COEFF = 0.9 # decay rate
 
     def __init__(self, params_dict, lr=1e-3):
         super().__init__(params_dict, lr)
@@ -49,6 +51,7 @@ class MomentumOptimizer(Optimizer):
 
     def step(self, param_grads: ParamDict) -> ParamDict:
         param_updates = {}
+        # v_t+1 = decay_rate * v_t + lr * gradient
         for k, grad in param_grads.items():
             self.velocity[k] = (
                 self.MOMENTUM_COEFF * self.velocity[k]
@@ -63,12 +66,13 @@ class AdaGradOptimizer(Optimizer):
 
     def __init__(self, params_dict, lr=1e-3):
         super().__init__(params_dict, lr)
-        self.cache = {
+        self.cache = { # accumulated sum of squared gradients
             k: np.zeros_like(v) for k, v in params_dict.items()
         }
 
     def step(self, param_grads: ParamDict) -> ParamDict:
         param_updates = {}
+        # theta_t+1 = theta_t - (lr / (sqrt(sum_of_gradients_squared) + eps)) * gradient
         for k, grad in param_grads.items():
             self.cache[k] += grad ** 2
             adaptive_lr = self.lr / (np.sqrt(self.cache[k]) + self.EPS)
@@ -88,6 +92,7 @@ class RMSPropOptimizer(Optimizer):
 
     def step(self, param_grads: ParamDict) -> ParamDict:
         param_updates = {}
+        # theta_t+1 = theta_t - (lr / (sqrt(decay_rate * sum_of_gradients_squared + (1 - decay_rate) * gradient^2) + eps)) * gradient
         for k, grad in param_grads.items():
             self.cache[k] = (
                 self.DECAY_RATE * self.cache[k]
@@ -98,7 +103,7 @@ class RMSPropOptimizer(Optimizer):
         return param_updates
 
 
-class AdamOptimizer(Optimizer):
+class AdamOptimizer(Optimizer): # combines Momentum and RMSProp
     BETA1 = 0.9
     BETA2 = 0.999
     EPS = 1e-8

@@ -58,13 +58,13 @@ class Swish(Activation):
 
     @staticmethod
     def forward(x):
-        s = 1 / (1 + np.exp(-x))
-        return x * s
+        sigmoid = 1 / (1 + np.exp(-x))
+        return x * sigmoid
 
     @staticmethod
     def backward(x):
-        s = 1 / (1 + np.exp(-x))
-        return s + x * s * (1 - s)
+        sigmoid = 1 / (1 + np.exp(-x))
+        return sigmoid + x * sigmoid * (1 - sigmoid)
 
 class LeakyReLU(Activation):
 
@@ -74,6 +74,7 @@ class LeakyReLU(Activation):
 
     @staticmethod
     def backward(x, alpha=0.01):
+        # Derivative is 1 for x > 0, alpha for x <= 0
         dx = np.ones_like(x)
         dx[x < 0] = alpha
         return dx
