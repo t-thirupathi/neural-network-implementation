@@ -9,7 +9,7 @@ from optimizer import *
 
 # ---------------- Termination ---------------- #
 class TerminationCriteria:
-    def __init__(self, max_iter, min_delta=1e-6, patience=50):
+    def __init__(self, max_iter, min_delta=1e-8, patience=50):
         self.max_iter = max_iter
         self.min_delta = min_delta
         self.patience = patience # Number of iterations to wait without improvement
@@ -32,26 +32,22 @@ class TerminationCriteria:
 
 # ---------------- Model ---------------- #
 class NeuralNetSolver:
-    INPUT_DIM = 2
-    HIDDEN_DIM = 3
-    OUTPUT_DIM = 1
-
-    MAX_ITER = 10
+    MAX_ITER = 10000
     INIT_RANGE = 0.1
-    NUM_EVALS = 10
+    NUM_EVALS = 100
 
-    def __init__(self):
+    def __init__(self, input_dim, hidden_dim, output_dim):
         # Randomly initialize weights
         self.params_dict = {
             'weights_1': np.random.normal(0, self.INIT_RANGE,
-                                          (self.INPUT_DIM, self.HIDDEN_DIM)),
-            'bias_1': np.zeros((1, self.HIDDEN_DIM)),
+                                          (input_dim, hidden_dim)),
+            'bias_1': np.zeros((1, hidden_dim)),
             'weights_2': np.random.normal(0, self.INIT_RANGE,
-                                          (self.HIDDEN_DIM, self.OUTPUT_DIM)),
-            'bias_2': np.zeros((1, self.OUTPUT_DIM))
+                                          (hidden_dim, output_dim)),
+            'bias_2': np.zeros((1, output_dim))
         }
         print("After random initialization - self.params_dict:\n", self.params_dict)
-        self.activation = Sigmoid()
+        self.activation = ReLU()
         self.optimizer = AdamOptimizer(self.params_dict, lr=1e-3)
         self.termination_criteria = TerminationCriteria(self.MAX_ITER)
 
@@ -61,8 +57,12 @@ class NeuralNetSolver:
         z1 = x @ self.params_dict['weights_1'] + self.params_dict['bias_1'] # @ is matrix multiplication
         a1 = self.activation.forward(z1)
 
-        # Linear output (regression)
+        # Linear output (regression) y_hat is same as z2 since output layer is linear
         y_hat = a1 @ self.params_dict['weights_2'] + self.params_dict['bias_2']
+        return y_hat, z1, a1
+
+    def predict(self, x):
+        y_hat, _, _ = self.forward(x)
         return y_hat
 
     # -------- Loss -------- #
@@ -75,21 +75,19 @@ class NeuralNetSolver:
         B = X.shape[0]
 
         # Forward cache
-        z1 = X @ self.params_dict['weights_1'] + self.params_dict['bias_1']
-        a1 = self.activation.forward(z1)
-        y_hat = a1 @ self.params_dict['weights_2'] + self.params_dict['bias_2']
+        y_hat, z1, a1 = self.forward(X)
 
         # MSE Loss: L = (1/B) * sum((y - y_hat)^2)
         # dL/dz2 (or d_z2 in short) = dL/dy_hat (since output layer is linear)
-        d_z2 = 2 * (y_hat - y)
+        d_z2 = (2 / B) * (y_hat - y)
 
         # Layer 2 grads
         # z2 = a1 * W2 + b2  =>  dz2/dw2 = a1, dz2/db2 = 1
         # by chain rule:
         # dL/dw2 = dL/dz2 * dz2/dw2 = a1.T @ dL/dz2
         # dL/db2 = dL/dz2 * dz2/db2 = sum over batch of dL/dz2  
-        w2_grad = a1.T @ d_z2 / B
-        b2_grad = np.sum(d_z2, axis=0, keepdims=True) / B
+        w2_grad = a1.T @ d_z2
+        b2_grad = np.sum(d_z2, axis=0, keepdims=True)
 
         # Backprop to layer 1
         # z1 = X * W1 + b1  =>  dz1/dw1 = X, dz1/db1 = 1
@@ -102,8 +100,8 @@ class NeuralNetSolver:
         # Layer 1 grads
         # dL/dw1 = dL/dz1 * dz1/dw1 = X.T @ dL/dz1
         # dL/db1 = dL/dz1 * dz1/db1 = sum over batch of dL/dz1
-        w1_grad = X.T @ d_z1 / B
-        b1_grad = np.sum(d_z1, axis=0, keepdims=True) / B
+        w1_grad = X.T @ d_z1
+        b1_grad = np.sum(d_z1, axis=0, keepdims=True)
 
         return {
             'weights_1': w1_grad,
@@ -115,13 +113,13 @@ class NeuralNetSolver:
     # -------- Train -------- #
     def fit(self, X_train, y_train, X_test, y_test):
         train_losses, test_losses = [], []
-        steps_for_eval = self.MAX_ITER // self.NUM_EVALS
+        steps_for_eval = max(1, self.MAX_ITER // self.NUM_EVALS)
 
         train_loss = np.inf
         iter = 0
 
         while not self.termination_criteria.is_over(iter, train_loss):
-            y_hat = self.forward(X_train) # use full batch
+            y_hat = self.predict(X_train) # use full batch
             train_loss = self.get_loss(y_train, y_hat)
 
             grads = self.get_loss_grad(X_train, y_train)
@@ -131,7 +129,7 @@ class NeuralNetSolver:
                 self.params_dict[k] -= updates[k]
 
             if iter % steps_for_eval == 0:
-                test_pred = self.forward(X_test)
+                test_pred = self.predict(X_test)
                 test_loss = self.get_loss(y_test, test_pred)
                 train_losses.append(train_loss)
                 test_losses.append(test_loss)
@@ -149,8 +147,11 @@ X = np.concatenate([x1, x2], axis=1)
 y = np.expand_dims(5 * X[:, 0] + 3 * X[:, 0] ** 2 + 50, -1)
 
 # Normalize input
-X_mean, X_std = X.mean(), X.std()
-y_mean, y_std = y.mean(), y.std()
+# Normalize each feature independently
+X_mean = X.mean(axis=0, keepdims=True)
+X_std = X.std(axis=0, keepdims=True)
+y_mean = y.mean(axis=0, keepdims=True)
+y_std = y.std(axis=0, keepdims=True)
 
 X = (X - X_mean) / X_std
 y = (y - y_mean) / y_std
@@ -158,7 +159,7 @@ y = (y - y_mean) / y_std
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 # ---------------- Train ---------------- #
-nn = NeuralNetSolver()
+nn = NeuralNetSolver(input_dim=2, hidden_dim=16, output_dim=1)
 train_losses, test_losses = nn.fit(X_train, y_train, X_test, y_test)
 
 # ---------------- Plots ---------------- #
@@ -171,7 +172,7 @@ plt.ylabel("MSE Loss")
 plt.title("Training Curve")
 
 plt.figure()
-pred = nn.forward(X)
+pred = nn.predict(X)
 plt.scatter(y, pred)
 plt.xlabel("True")
 plt.ylabel("Predicted")
